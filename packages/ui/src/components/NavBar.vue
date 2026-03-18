@@ -6,7 +6,7 @@
             <div v-else>
                 <a href="#" @click.prevent="setActiveWorkspace(null)">Workspaces</a> > <span>{{ activeWorkspace.name }}</span>
             </div>
-            <div style="margin-left: 0.5rem; font-size: 0.6rem" v-if="activeWorkspaceLoaded && activeWorkspace._type === 'file'">
+            <div style="margin-left: 0.5rem; font-size: 0.6rem" v-if="activeWorkspaceLoaded && activeWorkspace._type === 'file' && flags.isElectron">
                 <button class="button" @click="openWorkspaceFolder">Open Folder</button>
             </div>
             <div style="margin-left: 0.5rem; font-size: 0.6rem" v-if="activeWorkspaceLoaded">
@@ -65,7 +65,7 @@
             </div>
             <template v-if="nav === 'workspaces'">
                 <a href="#" @click.prevent="showAddWorkspace" class="bl">Add Workspace</a>
-                <a href="#" @click.prevent="openFileWorkspace" class="bl" title="Open an existing file workspace" v-if="flags.isElectron">Open File Workspace</a>
+                <a href="#" @click.prevent="openFileWorkspace" class="bl" title="Open an existing file workspace" v-if="flags.isElectron || flags.isWebStandalone">Open File Workspace</a>
                 <a href="#" @click.prevent="backupAndRestore" class="bl">Backup & Restore</a>
             </template>
             <div class="navbar-item">
@@ -99,7 +99,7 @@
         </div>
     </div>
     <PluginManagerModal v-model:showModal="showPluginManagerModal" />
-    <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :is-electron="flags.isElectron" />
+    <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :is-electron="flags.isElectron" :is-file-workspace-supported="flags.isElectron || flags.isWebStandalone" />
     <SettingsModal v-model:showModal="showSettingsModal" />
     <LogsModal v-model:showModal="showLogsModal"></LogsModal>
     <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" v-if="activeWorkspace" :key="activeWorkspace._id" />
@@ -318,6 +318,10 @@ export default {
             await window.electronIPC.openFolder(this.activeWorkspace.location)
         },
         async openFileWorkspace() {
+            if(import.meta.env.MODE === 'web-standalone') {
+                this.showAddWorkspaceModal = true
+                return
+            }
             const selectedFolderPath = await window.electronIPC.openFolderSelectionDialog()
             if(selectedFolderPath) {
                 try {

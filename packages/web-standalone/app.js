@@ -1,8 +1,13 @@
 import express from 'express'
 import { fetch, Agent } from 'undici'
 import multer from 'multer'
+import * as db from './src/db.js'
+import * as helpers from './src/helpers.js'
+import TaskQueue from './src/task-queue.js'
 
 const app = express()
+
+const operationQueue = new TaskQueue()
 
 const port = process.env.PORT || 4004
 
@@ -11,12 +16,32 @@ app.use(express.static('public'))
 const upload = multer()
 
 app.use((req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+        express.json({ limit: '50mb' })(req, res, next)
+    } else {
+        next()
+    }
+})
+
+app.use((req, res, next) => {
     if (req.is('multipart/*')) {
         upload.any()(req, res, next)
     } else {
         express.raw({ type: '*/*' })(req, res, next)
     }
 })
+
+function apiRoute(handler) {
+    return async (req, res) => {
+        try {
+            const result = await operationQueue.enqueue(() => handler(req.body))
+            res.json({ result })
+        } catch (e) {
+            console.error(e)
+            res.status(500).json({ error: e.message })
+        }
+    }
+}
 
 const agents = new Map()
 
@@ -113,6 +138,50 @@ app.post('/proxy', async(req, res) => {
             event: 'responseError',
             eventData: e.message
         })
+    }
+})
+
+// Workspace / collection routes
+app.post('/api/getWorkspaceAtLocation',           apiRoute(({ location, getEnvironments }) => db.getWorkspaceAtLocation(location, getEnvironments)))
+app.post('/api/updateWorkspace',                  apiRoute(({ workspace, updatedFields }) => db.updateWorkspace(workspace, updatedFields)))
+app.post('/api/ensureEmptyFolderOrEmptyWorkspace',apiRoute(({ location }) => db.ensureEmptyFolderOrEmptyWorkspace(location)))
+app.post('/api/getCollectionForWorkspace',        apiRoute(({ workspace, type }) => db.getCollectionForWorkspace(workspace, type)))
+app.post('/api/getCollectionById',                apiRoute(({ workspace, collectionId }) => db.getCollectionById(workspace, collectionId)))
+app.post('/api/createCollection',                 apiRoute(({ workspace, collection }) => db.createCollection(workspace, collection)))
+app.post('/api/createCollections',                apiRoute(({ workspace, collections }) => db.createCollections(workspace, collections)))
+app.post('/api/updateCollection',                 apiRoute(({ workspace, collectionId, updatedFields }) => db.updateCollection(workspace, collectionId, updatedFields)))
+app.post('/api/deleteCollectionsByWorkspaceId',   apiRoute(({ workspace }) => db.deleteCollectionsByWorkspaceId(workspace)))
+app.post('/api/deleteCollectionsByIds',           apiRoute(({ workspace, collectionIds }) => db.deleteCollectionsByIds(workspace, collectionIds)))
+
+// Response routes
+app.post('/api/getResponsesByCollectionId',       apiRoute(({ workspace, collectionId }) => db.getResponsesByCollectionId(workspace, collectionId)))
+app.post('/api/createResponse',                   apiRoute(({ workspace, response }) => db.createResponse(workspace, response)))
+app.post('/api/updateResponse',                   apiRoute(({ workspace, collectionId, responseId, updatedFields }) => db.updateResponse(workspace, collectionId, responseId, updatedFields)))
+app.post('/api/deleteResponse',                   apiRoute(({ workspace, collectionId, responseId }) => db.deleteResponse(workspace, collectionId, responseId)))
+app.post('/api/deleteResponsesByIds',             apiRoute(({ workspace, collectionId, responseIds }) => db.deleteResponsesByIds(workspace, collectionId, responseIds)))
+app.post('/api/deleteResponsesByCollectionIds',   apiRoute(({ workspace, collectionIds }) => db.deleteResponsesByCollectionIds(workspace, collectionIds)))
+app.post('/api/deleteResponsesByCollectionId',    apiRoute(({ workspace, collectionId }) => db.deleteResponsesByCollectionId(workspace, collectionId)))
+
+// Plugin routes
+app.post('/api/getWorkspacePlugins',              apiRoute(({ workspace }) => db.getWorkspacePlugins(workspace)))
+app.post('/api/createPlugin',                     apiRoute(({ workspace, plugin }) => db.createPlugin(workspace, plugin)))
+app.post('/api/updatePlugin',                     apiRoute(({ workspace, collectionId, pluginId, updatedFields }) => db.updatePlugin(workspace, collectionId, pluginId, updatedFields)))
+app.post('/api/deletePlugin',                     apiRoute(({ workspace, collectionId, pluginId }) => db.deletePlugin(workspace, collectionId, pluginId)))
+app.post('/api/deletePluginsByWorkspace',         apiRoute(({ workspace }) => db.deletePluginsByWorkspace(workspace)))
+app.post('/api/deletePluginsByCollectionIds',     apiRoute(({ workspace, collectionIds }) => db.deletePluginsByCollectionIds(workspace, collectionIds)))
+app.post('/api/createPlugins',                    apiRoute(({ workspace, plugins }) => db.createPlugins(workspace, plugins)))
+
+// File read route
+app.post('/api/readFile',                         apiRoute(({ filePath, workspaceLocation }) => helpers.readFile(filePath, workspaceLocation)))
+
+// Directory browse route (web-standalone only)
+app.get('/api/browse', async (req, res) => {
+    try {
+        const result = await helpers.browseDirectory(req.query.path || null)
+        res.json({ result })
+    } catch (e) {
+        console.error(e)
+        res.status(500).json({ error: e.message })
     }
 })
 

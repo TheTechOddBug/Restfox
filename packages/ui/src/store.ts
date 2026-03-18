@@ -23,7 +23,6 @@ import {
 } from './helpers'
 import {
     getResponsesByCollectionId,
-    getCollectionById,
     getCollectionForWorkspace,
     getAllWorkspaces,
     putWorkspace,
@@ -139,14 +138,14 @@ function setActiveTab(state: State, tab: CollectionItem, scrollSidebarItemIntoVi
     }
 }
 
-async function getAllParents(workspaceId: string, parentArray: CollectionItem[], request: CollectionItem) {
+function getAllParents(collection: CollectionItem[], parentArray: CollectionItem[], request: CollectionItem) {
     if(!request.parentId) {
         return
     }
-    const requestParent = await getCollectionById(workspaceId, request.parentId)
+    const requestParent = collection.find(item => item._id === request.parentId)
     if(requestParent) {
         parentArray.push(requestParent)
-        await getAllParents(workspaceId, parentArray, requestParent)
+        getAllParents(collection, parentArray, requestParent)
     }
 }
 
@@ -185,7 +184,7 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
 
         if(parent.headers) {
             const parentHeadersObject: Record<string, string[]> = {}
-            parent.headers.filter(header => !header.disabled).forEach(header => {
+            parent.headers.filter(header => !header.disabled && header.name !== '').forEach(header => {
                 if(parentHeadersObject[header.name]) {
                     parentHeadersObject[header.name].push(header.value)
                 } else {
@@ -1150,7 +1149,7 @@ export const store = createStore<State>({
             }
 
             let requestParentArray: CollectionItem[] = []
-            await getAllParents(context.state.activeWorkspace._id, requestParentArray, collectionItem)
+            getAllParents(context.state.collection, requestParentArray, collectionItem)
             requestParentArray = requestParentArray.reverse()
 
             if(collectionItem._type === 'request_group' && includeSelf) {

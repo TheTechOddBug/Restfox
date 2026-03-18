@@ -6,7 +6,7 @@
                 <input type="text" class="full-width-input" v-model="workspaceName" :placeholder="!workspace ? 'New Workspace' : 'Workspace Name'" required spellcheck="false" v-focus>
             </label>
 
-            <template v-if="isElectron">
+            <template v-if="isFileWorkspaceSupported">
                 <div style="margin-top: 1rem">
                     <label>
                         <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Type</div>
@@ -21,7 +21,8 @@
                         <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Choose a folder</div>
                         <div style="display: flex;">
                             <input type="text" class="full-width-input" v-model="workspaceLocation" placeholder="Folder Path" required spellcheck="false">
-                            <button class="button" type="button" @click="openFolderDialog">Choose</button>
+                            <button class="button" type="button" @click="openFolderDialog" v-if="isElectron">Choose</button>
+                            <button class="button" type="button" @click="showFolderBrowser = true" v-if="!isElectron">Browse</button>
                         </div>
                     </label>
                     <div style="margin-top: 0.5rem">Provide an empty folder or select a folder with an existing workspace</div>
@@ -34,10 +35,14 @@
             </template>
         </modal>
     </form>
+
+    <folder-browser-modal v-if="showFolderBrowser" v-model:showModal="showFolderBrowser" :initial-path="workspaceLocation" @folder-selected="workspaceLocation = $event" />
 </template>
 
 <script>
 import Modal from '@/components/Modal.vue'
+import FolderBrowserModal from '@/components/modals/FolderBrowserModal.vue'
+import { fileIPC } from '@/db'
 
 export default {
     directives: {
@@ -60,15 +65,21 @@ export default {
             type: Boolean,
             default: false
         },
+        isFileWorkspaceSupported: {
+            type: Boolean,
+            default: false
+        },
     },
     components: {
-        Modal
+        Modal,
+        FolderBrowserModal,
     },
     data() {
         return {
             workspaceName: 'New Workspace',
             workspaceType: 'local',
             workspaceLocation: '',
+            showFolderBrowser: false,
             workspaceTypes: [
                 { label: 'In Filesystem (Git Friendly)', value: 'file' },
                 { label: 'In Application', value: 'local' }
@@ -100,7 +111,7 @@ export default {
         showModal() {
             if(this.showModal && this.workspace === undefined) {
                 this.workspaceName = 'New Workspace'
-                if(this.isElectron) {
+                if(this.isFileWorkspaceSupported) {
                     this.workspaceType = 'file'
                 } else {
                     this.workspaceType = 'local'
@@ -150,8 +161,10 @@ export default {
         },
         async getSetWorkspaceName() {
             try {
-                const workspace = await window.electronIPC.getWorkspaceAtLocation(this.workspaceLocation)
-                this.workspaceName = workspace.name
+                const workspace = await fileIPC.getWorkspaceAtLocation(this.workspaceLocation, false)
+                if(workspace) {
+                    this.workspaceName = workspace.name
+                }
             } catch {}
         },
         async openFolderDialog() {

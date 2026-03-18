@@ -6,7 +6,7 @@
                 <input type="text" class="full-width-input" v-model="newName" placeholder="Workspace Name" required spellcheck="false" v-focus :disabled="duplicating">
             </label>
 
-            <template v-if="isElectron">
+            <template v-if="isFileWorkspaceSupported">
                 <div style="margin-top: 1rem">
                     <label>
                         <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Type</div>
@@ -21,7 +21,8 @@
                         <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Choose a folder</div>
                         <div style="display: flex;">
                             <input type="text" class="full-width-input" v-model="workspaceLocation" placeholder="Folder Path" required spellcheck="false" :disabled="duplicating">
-                            <button class="button" type="button" @click="openFolderDialog" :disabled="duplicating">Choose</button>
+                            <button class="button" type="button" @click="openFolderDialog" :disabled="duplicating" v-if="isElectron">Choose</button>
+                            <button class="button" type="button" @click="showFolderBrowser = true" :disabled="duplicating" v-if="!isElectron">Browse</button>
                         </div>
                     </label>
                     <div style="margin-top: 0.5rem">Provide an empty folder</div>
@@ -40,10 +41,14 @@
             </template>
         </modal>
     </form>
+
+    <folder-browser-modal v-if="showFolderBrowser" v-model:showModal="showFolderBrowser" :initial-path="workspaceLocation" @folder-selected="workspaceLocation = $event" />
 </template>
 
 <script>
 import Modal from '@/components/Modal.vue'
+import FolderBrowserModal from '@/components/modals/FolderBrowserModal.vue'
+import { fileIPC } from '@/db'
 
 export default {
     directives: {
@@ -61,15 +66,21 @@ export default {
             type: Boolean,
             default: false
         },
+        isFileWorkspaceSupported: {
+            type: Boolean,
+            default: false
+        },
     },
     components: {
-        Modal
+        Modal,
+        FolderBrowserModal,
     },
     data() {
         return {
             newName: '',
             workspaceType: 'local',
             workspaceLocation: '',
+            showFolderBrowser: false,
             workspaceTypes: [
                 { label: 'In Filesystem (Git Friendly)', value: 'file' },
                 { label: 'In Application', value: 'local' }
@@ -96,7 +107,7 @@ export default {
             if(this.workspaceToDuplicate) {
                 this.newName = this.workspaceToDuplicate.name + ' (copy)'
 
-                if(this.isElectron) {
+                if(this.isFileWorkspaceSupported) {
                     this.workspaceType = 'file'
                     this.workspaceLocation = ''
                 }
@@ -105,8 +116,8 @@ export default {
     },
     methods: {
         async duplicateWorkspace() {
-            if(this.isElectron && this.workspaceType === 'file') {
-                const result = await window.electronIPC.ensureEmptyFolderOrEmptyWorkspace(this.workspaceLocation)
+            if(this.isFileWorkspaceSupported && this.workspaceType === 'file') {
+                const result = await fileIPC.ensureEmptyFolderOrEmptyWorkspace(this.workspaceLocation)
 
                 if(result.error) {
                     this.$toast.error(result.error)

@@ -6,6 +6,7 @@ import { Arena } from '@flawiddsouza/quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
 import { fetchWrapper, substituteEnvironmentVariables } from './helpers'
+import { fileIPC } from './db'
 import {
     CollectionItem,
     RequestParam,
@@ -288,7 +289,7 @@ function addReadFileToVM(vm: QuickJSContext, parentPathForReadFile: string | nul
         const path = vm.getString(pathHandle)
         console.log('reading file', path)
         const promise = vm.newPromise()
-        window.electronIPC.readFile(path, parentPathForReadFile).then((result: any) => {
+        fileIPC!.readFile(path, parentPathForReadFile).then((result: any) => {
             if(result.error) {
                 const returnError = vm.newError(result.error)
                 promise.reject(returnError)
@@ -449,7 +450,7 @@ export async function usePlugin(expose: PluginExpose, plugin: { name: string, co
     addAlertMethodToVM(vm)
     addAtobMethodToVM(vm)
 
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         addReadFileToVM(vm, plugin.parentPathForReadFile)
     }
 

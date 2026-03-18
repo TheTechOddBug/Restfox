@@ -17,6 +17,7 @@ RUN npm ci
 FROM node:19.8.1-alpine3.17
 RUN mkdir -p /app/web-standalone/public
 WORKDIR /app/web-standalone
+VOLUME /app/data
 COPY --from=build /app/web-standalone /app/web-standalone
 COPY --from=build /app/packages/ui/dist /app/web-standalone/public
 CMD ["npm", "start"]

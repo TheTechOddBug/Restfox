@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
                     }
                 }
             }),
-            VitePWA({
+            mode !== 'web-standalone' ? VitePWA({
                 includeAssets: [
                     'favicon.png',
                     'favicon.ico',
@@ -55,7 +55,28 @@ export default defineConfig(({ mode }) => {
                     // default limit is 2 MB (https://vite-plugin-pwa.netlify.app/guide/faq.html#missing-assets-from-sw-precache-manifest)
                     maximumFileSizeToCacheInBytes: 4000000 // increase to 4 MB
                 }
-            }),
+            }) : {
+                // Stub for virtual:pwa-register/vue so ReloadPrompt.vue compiles
+                // without VitePWA generating a service worker in web-standalone mode
+                name: 'pwa-stub',
+                resolveId(id) {
+                    if (id === 'virtual:pwa-register/vue') return id
+                },
+                load(id) {
+                    if (id === 'virtual:pwa-register/vue') {
+                        return `
+                            import { ref } from 'vue'
+                            export function useRegisterSW() {
+                                return {
+                                    offlineReady: ref(false),
+                                    needRefresh: ref(false),
+                                    updateServiceWorker: () => {},
+                                }
+                            }
+                        `
+                    }
+                }
+            },
             process.env.VITEST ? null : checker({
                 typescript: true
             }),
@@ -117,7 +138,7 @@ export default defineConfig(({ mode }) => {
                 targets: [
                     { src: 'dist/*', dest: '../web-standalone/public' },
                 ],
-                hook: 'buildEnd'
+                hook: 'writeBundle'
             })
         )
     }

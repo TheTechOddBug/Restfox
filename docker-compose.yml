@@ -6,4 +6,5 @@ services:
     container_name: Restfox
     ports:
       - "${CUSTOM_PORT_ON_HOST:-4004}:4004"
-    detach: true
+    volumes:
+      - ./data:/app/data   # mount your collections here; use this path in the "File Workspace" folder path field

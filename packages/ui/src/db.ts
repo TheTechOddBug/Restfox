@@ -9,6 +9,67 @@ import {
     Workspace,
 } from './global'
 
+async function callWebStandaloneAPI(method: string, args: Record<string, unknown>) {
+    const res = await fetch(`/api/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(args, (_, value) => {
+            if(value instanceof ArrayBuffer) {
+                return Array.from(new Uint8Array(value))
+            }
+            if(value instanceof Uint8Array) {
+                return Array.from(value)
+            }
+            return value
+        }),
+    })
+    const data = await res.json()
+    if (data.error) {
+        throw new Error(data.error)
+    }
+    return data.result
+}
+
+const webStandaloneIPC = {
+    getWorkspaceAtLocation:             (location: string, getEnvironments = false) => callWebStandaloneAPI('getWorkspaceAtLocation', { location, getEnvironments }),
+    updateWorkspace:                    (workspace: any, updatedFields: any) => callWebStandaloneAPI('updateWorkspace', { workspace, updatedFields }),
+    ensureEmptyFolderOrEmptyWorkspace:  (location: string) => callWebStandaloneAPI('ensureEmptyFolderOrEmptyWorkspace', { location }),
+    getCollectionForWorkspace:          (workspace: any, type: any) => callWebStandaloneAPI('getCollectionForWorkspace', { workspace, type }),
+    getCollectionById:                  (workspace: any, collectionId: string) => callWebStandaloneAPI('getCollectionById', { workspace, collectionId }),
+    createCollection:                   (workspace: any, collection: any) => callWebStandaloneAPI('createCollection', { workspace, collection }),
+    createCollections:                  (workspace: any, collections: any[]) => callWebStandaloneAPI('createCollections', { workspace, collections }),
+    updateCollection:                   (workspace: any, collectionId: string, updatedFields: any) => callWebStandaloneAPI('updateCollection', { workspace, collectionId, updatedFields }),
+    deleteCollectionsByWorkspaceId:     (workspace: any) => callWebStandaloneAPI('deleteCollectionsByWorkspaceId', { workspace }),
+    deleteCollectionsByIds:             (workspace: any, collectionIds: string[]) => callWebStandaloneAPI('deleteCollectionsByIds', { workspace, collectionIds }),
+    getResponsesByCollectionId:         (workspace: any, collectionId: string) => callWebStandaloneAPI('getResponsesByCollectionId', { workspace, collectionId }),
+    createResponse:                     (workspace: any, response: any) => callWebStandaloneAPI('createResponse', { workspace, response }),
+    updateResponse:                     (workspace: any, collectionId: string, responseId: string, updatedFields: any) => callWebStandaloneAPI('updateResponse', { workspace, collectionId, responseId, updatedFields }),
+    deleteResponse:                     (workspace: any, collectionId: string, responseId: string) => callWebStandaloneAPI('deleteResponse', { workspace, collectionId, responseId }),
+    deleteResponsesByIds:               (workspace: any, collectionId: string, responseIds: string[]) => callWebStandaloneAPI('deleteResponsesByIds', { workspace, collectionId, responseIds }),
+    deleteResponsesByCollectionIds:     (workspace: any, collectionIds: string[]) => callWebStandaloneAPI('deleteResponsesByCollectionIds', { workspace, collectionIds }),
+    deleteResponsesByCollectionId:      (workspace: any, collectionId: string) => callWebStandaloneAPI('deleteResponsesByCollectionId', { workspace, collectionId }),
+    getWorkspacePlugins:                (workspace: any) => callWebStandaloneAPI('getWorkspacePlugins', { workspace }),
+    createPlugin:                       (workspace: any, plugin: any) => callWebStandaloneAPI('createPlugin', { workspace, plugin }),
+    updatePlugin:                       (workspace: any, collectionId: string | null, pluginId: string, updatedFields: any) => callWebStandaloneAPI('updatePlugin', { workspace, collectionId, pluginId, updatedFields }),
+    deletePlugin:                       (workspace: any, collectionId: string | null, pluginId: string) => callWebStandaloneAPI('deletePlugin', { workspace, collectionId, pluginId }),
+    deletePluginsByWorkspace:           (workspace: any) => callWebStandaloneAPI('deletePluginsByWorkspace', { workspace }),
+    deletePluginsByCollectionIds:       (workspace: any, collectionIds: string[]) => callWebStandaloneAPI('deletePluginsByCollectionIds', { workspace, collectionIds }),
+    createPlugins:                      (workspace: any, plugins: any[]) => callWebStandaloneAPI('createPlugins', { workspace, plugins }),
+    readFile:                           (filePath: string, workspaceLocation?: string) => callWebStandaloneAPI('readFile', { filePath, workspaceLocation }),
+}
+
+function resolveFileIPC() {
+    if (import.meta.env.MODE === 'desktop-electron') {
+        return window.electronIPC
+    }
+    if (import.meta.env.MODE === 'web-standalone') {
+        return webStandaloneIPC
+    }
+    return null
+}
+
+export const fileIPC = resolveFileIPC()
+
 export class RestfoxDatabase extends Dexie {
     workspaces!: Dexie.Table<any>
     collections!: Dexie.Table<any>
@@ -60,12 +121,12 @@ export async function putWorkspace(workspace: Workspace) {
 }
 
 export async function updateWorkspace(workspaceId: string, updatedFields: Partial<Workspace>, skipUpdateForFileWorkspace = false) {
-    if(import.meta.env.MODE === 'desktop-electron' && !skipUpdateForFileWorkspace) {
+    if(fileIPC && !skipUpdateForFileWorkspace) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
             // this will used for updating workspace name, environments & currentEnvironment
             try {
-                await window.electronIPC.updateWorkspace(workspace, updatedFields)
+                await fileIPC.updateWorkspace(workspace, updatedFields)
             } catch (e) {
                 // This will error out if updatedFields.location was incorrect in the previous update
                 // so the user will not be able to fix the location if we don't catch this error
@@ -96,10 +157,15 @@ export async function getAllCollectionIdsForGivenWorkspace(workspaceId: string) 
 }
 
 export async function getCollectionForWorkspace(workspaceId: string, type = null): Promise<{ error: string | null, collection: CollectionItem[], workspace: FileWorkspace | null, idMap: Map<string, string> | null }> {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            const result = await window.electronIPC.getCollectionForWorkspace(workspace, type)
+            const result = await fileIPC.getCollectionForWorkspace(workspace, type)
+
+            // web-standalone: idMap is serialized as array of entries over HTTP (JSON doesn't support Map)
+            if (Array.isArray(result.idMap)) {
+                result.idMap = new Map(result.idMap)
+            }
 
             if (type === null) {
                 for(const collectionItem of result.collection) {
@@ -129,10 +195,10 @@ export async function getCollectionForWorkspace(workspaceId: string, type = null
 }
 
 export async function getCollectionById(workspaceId: string, collectionId: string): Promise<CollectionItem> {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.getCollectionById(workspace, collectionId)
+            return fileIPC.getCollectionById(workspace, collectionId)
         }
     }
 
@@ -146,10 +212,10 @@ interface CreateCollectionResult {
 }
 
 export async function createCollection(workspaceId: string, collection: CollectionItem): Promise<CreateCollectionResult> {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.createCollection(workspace, collection)
+            return fileIPC.createCollection(workspace, collection)
         }
     }
 
@@ -168,13 +234,13 @@ export async function createCollections(workspaceId: string, collections: Collec
 }> {
     console.log('createCollections', collections)
 
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
             const collectionsClone = structuredClone(collections)
             await Promise.all(collectionsClone.map(collection => serializeRequestFiles(collection)))
             console.log('createCollections: serialized', collectionsClone)
-            return window.electronIPC.createCollections(workspace, collectionsClone)
+            return fileIPC.createCollections(workspace, collectionsClone)
         }
     }
 
@@ -195,7 +261,8 @@ async function transformFileToFileObject(file: File): Promise<FileObject> {
 }
 
 function transformFileObjectToFile(file: FileObject): File {
-    return new File([file.buffer], file.name, { type: file.type })
+    const buffer = Array.isArray(file.buffer) ? new Uint8Array(file.buffer as number[]) : file.buffer
+    return new File([buffer], file.name, { type: file.type })
 }
 
 async function serializeRequestFiles(collection: Partial<CollectionItem>) {
@@ -215,7 +282,7 @@ async function serializeRequestFiles(collection: Partial<CollectionItem>) {
 }
 
 function deserializeRequestFiles(collection: Partial<CollectionItem>) {
-    if(collection.body && collection.body.fileName && 'buffer' in collection.body.fileName && collection.body.fileName.buffer instanceof Uint8Array) {
+    if(collection.body && collection.body.fileName && 'buffer' in collection.body.fileName && (collection.body.fileName.buffer instanceof Uint8Array || Array.isArray(collection.body.fileName.buffer))) {
         collection.body.fileName = transformFileObjectToFile(collection.body.fileName)
     }
 
@@ -251,12 +318,16 @@ async function serializeRequestResponseFiles(response: RequestFinalResponse) {
 }
 
 function deserializeRequestResponseFiles(response: RequestFinalResponse) {
-    if(response.request.body && response.request.body.buffer instanceof Uint8Array) {
+    if(Array.isArray(response.buffer)) {
+        response.buffer = new Uint8Array(response.buffer as unknown as number[]).buffer
+    }
+
+    if(response.request.body && (response.request.body.buffer instanceof Uint8Array || Array.isArray(response.request.body.buffer))) {
         response.request.body = transformFileObjectToFile(response.request.body)
     }
 
     if(response.request.original.body) {
-        if(response.request.original.body.fileName && response.request.original.body.fileName instanceof Uint8Array) {
+        if(response.request.original.body.fileName && 'buffer' in response.request.original.body.fileName && (response.request.original.body.fileName.buffer instanceof Uint8Array || Array.isArray(response.request.original.body.fileName.buffer))) {
             response.request.original.body.fileName = transformFileObjectToFile(response.request.original.body.fileName)
         }
 
@@ -271,11 +342,11 @@ function deserializeRequestResponseFiles(response: RequestFinalResponse) {
 }
 
 export async function updateCollection(workspaceId: string, collectionId: string, updatedFields: Partial<CollectionItem>): Promise<{ error: string | null }> {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
             await serializeRequestFiles(updatedFields)
-            return window.electronIPC.updateCollection(workspace, collectionId, updatedFields)
+            return fileIPC.updateCollection(workspace, collectionId, updatedFields)
         }
     }
 
@@ -291,10 +362,10 @@ export async function modifyCollections(workspaceId: string) {
 }
 
 export async function deleteCollectionsByWorkspaceId(workspaceId: string) {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.deleteCollectionsByWorkspaceId(workspace)
+            return fileIPC.deleteCollectionsByWorkspaceId(workspace)
         }
     }
 
@@ -302,10 +373,10 @@ export async function deleteCollectionsByWorkspaceId(workspaceId: string) {
 }
 
 export async function deleteCollectionsByIds(workspaceId: string, collectionIds: string[]): Promise<{ error: string | null }> {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.deleteCollectionsByIds(workspace, collectionIds)
+            return fileIPC.deleteCollectionsByIds(workspace, collectionIds)
         }
     }
 
@@ -319,10 +390,10 @@ export async function deleteCollectionsByIds(workspaceId: string, collectionIds:
 // Responses
 
 export async function getResponsesByCollectionId(workspaceId: string, collectionId: string): Promise<RequestFinalResponse[]> {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            const responses = await window.electronIPC.getResponsesByCollectionId(workspace, collectionId)
+            const responses = await fileIPC.getResponsesByCollectionId(workspace, collectionId)
             for(const response of responses) {
                 deserializeRequestResponseFiles(response)
             }
@@ -334,11 +405,11 @@ export async function getResponsesByCollectionId(workspaceId: string, collection
 }
 
 export async function createResponse(workspaceId: string, response: RequestFinalResponse) {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
             await serializeRequestResponseFiles(response)
-            return window.electronIPC.createResponse(workspace, response)
+            return fileIPC.createResponse(workspace, response)
         }
     }
 
@@ -346,10 +417,10 @@ export async function createResponse(workspaceId: string, response: RequestFinal
 }
 
 export async function updateResponse(workspaceId: string, collectionId: string, responseId: string, updatedFields: Partial<RequestFinalResponse>) {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.updateResponse(workspace, collectionId, responseId, updatedFields)
+            return fileIPC.updateResponse(workspace, collectionId, responseId, updatedFields)
         }
     }
 
@@ -357,10 +428,10 @@ export async function updateResponse(workspaceId: string, collectionId: string, 
 }
 
 export async function deleteResponse(workspaceId: string, collectionId: string, responseId: string) {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.deleteResponse(workspace, collectionId, responseId)
+            return fileIPC.deleteResponse(workspace, collectionId, responseId)
         }
     }
 
@@ -373,10 +444,10 @@ export async function deleteResponsesByIds(workspaceId: string, collectionId: st
         responseIds,
     })
 
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.deleteResponsesByIds(workspace, collectionId, responseIds)
+            return fileIPC.deleteResponsesByIds(workspace, collectionId, responseIds)
         }
     }
 
@@ -384,10 +455,10 @@ export async function deleteResponsesByIds(workspaceId: string, collectionId: st
 }
 
 export async function deleteResponsesByCollectionIds(workspaceId: string, collectionIds: string[]) {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.deleteResponsesByCollectionIds(workspace, collectionIds)
+            return fileIPC.deleteResponsesByCollectionIds(workspace, collectionIds)
         }
     }
 
@@ -395,10 +466,10 @@ export async function deleteResponsesByCollectionIds(workspaceId: string, collec
 }
 
 export async function deleteResponsesByCollectionId(workspaceId: string, collectionId: string) {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.deleteResponsesByCollectionId(workspace, collectionId)
+            return fileIPC.deleteResponsesByCollectionId(workspace, collectionId)
         }
     }
 
@@ -414,10 +485,10 @@ export async function getGlobalPlugins() {
 }
 
 export async function getWorkspacePlugins(workspaceId: string) {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
-            return window.electronIPC.getWorkspacePlugins(workspace)
+            return fileIPC.getWorkspacePlugins(workspace)
         }
     }
 
@@ -438,10 +509,10 @@ export async function createPlugin(plugin: Plugin, workspaceId: string | null = 
         workspaceId,
     })
 
-    if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
+    if(fileIPC && workspaceId !== null) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
-            return window.electronIPC.createPlugin(workspace, plugin)
+            return fileIPC.createPlugin(workspace, plugin)
         }
     }
 
@@ -456,10 +527,10 @@ export async function updatePlugin(pluginId: string, updatedFields: Partial<Plug
         collectionId,
     })
 
-    if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
+    if(fileIPC && workspaceId !== null) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
-            return window.electronIPC.updatePlugin(workspace, collectionId, pluginId, updatedFields)
+            return fileIPC.updatePlugin(workspace, collectionId, pluginId, updatedFields)
         }
     }
 
@@ -473,10 +544,10 @@ export async function deletePlugin(pluginId: string, workspaceId: string | null 
         collectionId,
     })
 
-    if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
+    if(fileIPC && workspaceId !== null) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
-            return window.electronIPC.deletePlugin(workspace, collectionId, pluginId)
+            return fileIPC.deletePlugin(workspace, collectionId, pluginId)
         }
     }
 
@@ -484,10 +555,10 @@ export async function deletePlugin(pluginId: string, workspaceId: string | null 
 }
 
 export async function deletePluginsByWorkspace(workspaceId: string) {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
-            return window.electronIPC.deletePluginsByWorkspace(workspace)
+            return fileIPC.deletePluginsByWorkspace(workspace)
         }
     }
 
@@ -495,10 +566,10 @@ export async function deletePluginsByWorkspace(workspaceId: string) {
 }
 
 export async function deletePluginsByCollectionIds(workspaceId: string, collectionIds: string[]) {
-    if(import.meta.env.MODE === 'desktop-electron') {
+    if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
-            return window.electronIPC.deletePluginsByCollectionIds(workspace, collectionIds)
+            return fileIPC.deletePluginsByCollectionIds(workspace, collectionIds)
         }
     }
 
@@ -512,10 +583,10 @@ export async function createPlugins(plugins: Plugin[], workspaceId: string | nul
         workspaceId,
     })
 
-    if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
+    if(fileIPC && workspaceId !== null) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
-            return window.electronIPC.createPlugins(workspace, plugins)
+            return fileIPC.createPlugins(workspace, plugins)
         }
     }
 

@@ -12,8 +12,8 @@
             <div class="workspace-timestamp">{{ dateFormat(workspace.createdAt) }}</div>
         </div>
         <ContextMenu :options="options" v-model:show="showContextMenu" @click="handleContextMenuClick" :element="contextMenuElement" />
-        <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :workspace="contextMenuWorkspace" :is-electron="flags.isElectron" />
-        <DuplicateWorkspaceModal v-model:showModal="showDuplicateWorkspaceModal" :workspace-to-duplicate="workspaceToDuplicate" :is-electron="flags.isElectron" />
+        <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :workspace="contextMenuWorkspace" :is-electron="flags.isElectron" :is-file-workspace-supported="flags.isElectron || flags.isWebStandalone" />
+        <DuplicateWorkspaceModal v-model:showModal="showDuplicateWorkspaceModal" :workspace-to-duplicate="workspaceToDuplicate" :is-electron="flags.isElectron" :is-file-workspace-supported="flags.isElectron || flags.isWebStandalone" />
     </div>
 </template>
 
