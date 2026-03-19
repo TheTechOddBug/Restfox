@@ -337,7 +337,7 @@ async function serializeRequestResponseFiles(response) {
     }
 
     if(response.request && response.request.original.body) {
-        if(response.request.original.body.fileName && response.request.original.body.fileName instanceof ArrayBuffer) {
+        if(response.request.original.body.fileName && response.request.original.body.fileName.buffer instanceof ArrayBuffer) {
             response.request.original.body.fileName = fileUtils.transformFileObjectToSaveableFileObject(response.request.original.body.fileName)
         }
 
@@ -359,7 +359,7 @@ function deserializeRequestResponseFiles(response) {
     }
 
     if(response.request.original.body) {
-        if(response.request.original.body.fileName && response.request.original.body.fileName instanceof ArrayBuffer) {
+        if(response.request.original.body.fileName && typeof response.request.original.body.fileName.buffer === 'string') {
             response.request.original.body.fileName = fileUtils.transformSavedFileObjectToFileObject(response.request.original.body.fileName)
         }
 
