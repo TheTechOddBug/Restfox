@@ -65,6 +65,7 @@ export interface FileObject {
     name: string
     type: string
     buffer: ArrayBuffer
+    bufferOmitted?: boolean
 }
 
 export interface RequestParam {

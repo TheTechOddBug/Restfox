@@ -204,19 +204,17 @@ function logEvent(fsLog, id, event, path, reason) {
 }
 
 function transformFileObjectToSaveableFileObject(file) {
-    return {
-        name: file.name,
-        type: file.type,
-        buffer: Buffer.from(file.buffer).toString('base64')
+    if(file.bufferOmitted) {
+        return { name: file.name, type: file.type, buffer: '', bufferOmitted: true }
     }
+    return { name: file.name, type: file.type, buffer: Buffer.from(file.buffer).toString('base64') }
 }
 
 function transformSavedFileObjectToFileObject(file) {
-    return {
-        name: file.name,
-        type: file.type,
-        buffer: Buffer.from(file.buffer, 'base64')
+    if(file.bufferOmitted) {
+        return { name: file.name, type: file.type, buffer: Buffer.alloc(0), bufferOmitted: true }
     }
+    return { name: file.name, type: file.type, buffer: Buffer.from(file.buffer, 'base64') }
 }
 
 module.exports = {

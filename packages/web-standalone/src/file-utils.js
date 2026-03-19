@@ -86,17 +86,15 @@ export async function renameFileOrFolder(oldPath, newPath, _fsLog, _reason) {
 }
 
 export function transformFileObjectToSaveableFileObject(file) {
-    return {
-        name: file.name,
-        type: file.type,
-        buffer: Buffer.from(file.buffer).toString('base64'),
+    if(file.bufferOmitted) {
+        return { name: file.name, type: file.type, buffer: '', bufferOmitted: true }
     }
+    return { name: file.name, type: file.type, buffer: Buffer.from(file.buffer).toString('base64') }
 }
 
 export function transformSavedFileObjectToFileObject(file) {
-    return {
-        name: file.name,
-        type: file.type,
-        buffer: Array.from(Buffer.from(file.buffer, 'base64')),
+    if(file.bufferOmitted) {
+        return { name: file.name, type: file.type, buffer: [], bufferOmitted: true }
     }
+    return { name: file.name, type: file.type, buffer: Array.from(Buffer.from(file.buffer, 'base64')) }
 }

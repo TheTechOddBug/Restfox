@@ -253,14 +253,19 @@ export async function createCollections(workspaceId: string, collections: Collec
 }
 
 async function transformFileToFileObject(file: File): Promise<FileObject> {
-    return {
-        name: file.name,
-        type: file.type,
-        buffer: await file.arrayBuffer()
+    try {
+        return { name: file.name, type: file.type, buffer: await file.arrayBuffer() }
+    } catch {
+        return { name: file.name, type: file.type, buffer: new ArrayBuffer(0), bufferOmitted: true }
     }
 }
 
-function transformFileObjectToFile(file: FileObject): File {
+function transformFileObjectToFile(file: FileObject): File | null {
+    // Return null so the caller clears the reference — better to show "No File Selected"
+    // than silently send 0 bytes.
+    if(file.bufferOmitted) {
+        return null
+    }
     const buffer = Array.isArray(file.buffer) ? new Uint8Array(file.buffer as number[]) : file.buffer
     return new File([buffer], file.name, { type: file.type })
 }
@@ -283,13 +288,13 @@ async function serializeRequestFiles(collection: Partial<CollectionItem>) {
 
 function deserializeRequestFiles(collection: Partial<CollectionItem>) {
     if(collection.body && collection.body.fileName && 'buffer' in collection.body.fileName && (collection.body.fileName.buffer instanceof Uint8Array || Array.isArray(collection.body.fileName.buffer))) {
-        collection.body.fileName = transformFileObjectToFile(collection.body.fileName)
+        collection.body.fileName = transformFileObjectToFile(collection.body.fileName) ?? undefined
     }
 
     if(collection.body && collection.body.params) {
         for(const param of collection.body.params) {
             if(param.files) {
-                param.files = param.files.map(file => transformFileObjectToFile(file as FileObject))
+                param.files = param.files.map(file => transformFileObjectToFile(file as FileObject)).filter(Boolean) as File[]
             }
         }
     }
@@ -323,18 +328,18 @@ function deserializeRequestResponseFiles(response: RequestFinalResponse) {
     }
 
     if(response.request.body && (response.request.body.buffer instanceof Uint8Array || Array.isArray(response.request.body.buffer))) {
-        response.request.body = transformFileObjectToFile(response.request.body)
+        response.request.body = transformFileObjectToFile(response.request.body) ?? undefined
     }
 
     if(response.request.original.body) {
         if(response.request.original.body.fileName && 'buffer' in response.request.original.body.fileName && (response.request.original.body.fileName.buffer instanceof Uint8Array || Array.isArray(response.request.original.body.fileName.buffer))) {
-            response.request.original.body.fileName = transformFileObjectToFile(response.request.original.body.fileName)
+            response.request.original.body.fileName = transformFileObjectToFile(response.request.original.body.fileName) ?? undefined
         }
 
         if(response.request.original.body.params) {
             for(const param of response.request.original.body.params) {
                 if(param.files) {
-                    param.files = param.files.map(file => transformFileObjectToFile(file as FileObject))
+                    param.files = param.files.map(file => transformFileObjectToFile(file as FileObject)).filter(Boolean) as File[]
                 }
             }
         }
