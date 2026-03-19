@@ -1,6 +1,6 @@
 import express from 'express'
 import { fetch, Agent } from 'undici'
-import multer from 'multer'
+import { Readable } from 'stream'
 import * as db from './src/db.js'
 import * as helpers from './src/helpers.js'
 import TaskQueue from './src/task-queue.js'
@@ -13,23 +13,7 @@ const port = process.env.PORT || 4004
 
 app.use(express.static('public'))
 
-const upload = multer()
-
-app.use((req, res, next) => {
-    if (req.path.startsWith('/api/')) {
-        express.json({ limit: '50mb' })(req, res, next)
-    } else {
-        next()
-    }
-})
-
-app.use((req, res, next) => {
-    if (req.is('multipart/*')) {
-        upload.any()(req, res, next)
-    } else {
-        express.raw({ type: '*/*' })(req, res, next)
-    }
-})
+app.use('/api/', express.json({ limit: '50mb' }))
 
 function apiRoute(handler) {
     return async (req, res) => {
@@ -67,29 +51,25 @@ app.post('/proxy', async(req, res) => {
     const url = req.headers['x-proxy-req-url']
     const method = req.headers['x-proxy-req-method']
     const headers = {}
-    let body
 
     const agent = getAgentForRequest(new URL(url), disableSSLVerification)
-
-    if (req.is('multipart/*')) {
-        const files = req.files
-
-        body = new FormData()
-
-        Object.keys(files).forEach(field => {
-            const file = files[field]
-            const blob = new Blob([file.buffer], { type: file.mimetype })
-            body.append(file.fieldname, blob, file.originalname)
-        })
-    } else {
-        body = req.body
-    }
 
     Object.keys(req.headers).forEach(header => {
         if(header.startsWith('x-proxy-req-header-')) {
             headers[header.replace('x-proxy-req-header-', '')] = req.headers[header]
         }
     })
+
+    // For multipart, the user-configured content-type lacks the multipart boundary.
+    // Use the actual incoming content-type (which includes the boundary) so the
+    // target server can correctly parse the multipart body.
+    if(req.is('multipart/*')) {
+        headers['content-type'] = req.headers['content-type']
+    }
+
+    // Stream the request body directly to the target — no in-memory buffering.
+    // This allows large file uploads without loading the file into RAM.
+    const body = method !== 'GET' ? Readable.toWeb(req) : undefined
 
     try {
         const startTime = new Date()
@@ -98,7 +78,8 @@ app.post('/proxy', async(req, res) => {
             dispatcher: agent,
             method,
             headers,
-            body: method !== 'GET' ? body : undefined
+            body,
+            duplex: 'half',
         })
 
         const headEndTime = new Date()
@@ -134,6 +115,7 @@ app.post('/proxy', async(req, res) => {
             eventData: responseToSend
         })
     } catch(e) {
+        console.error('proxy error:', e)
         res.send({
             event: 'responseError',
             eventData: e.message

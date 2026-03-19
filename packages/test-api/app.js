@@ -36,6 +36,25 @@ app.post('/upload-multipart', upload.any(), (req, res) => {
     })
 })
 
+// Streaming upload - drains the body without buffering, suitable for large files
+app.post('/upload-multipart-stream', (req, res) => {
+    let received = 0
+    const start = Date.now()
+
+    req.on('data', chunk => { received += chunk.length })
+
+    req.on('end', () => {
+        res.send({
+            received,
+            elapsed: `${((Date.now() - start) / 1000).toFixed(2)}s`,
+        })
+    })
+
+    req.on('error', err => {
+        res.status(500).send({ error: err.message })
+    })
+})
+
 app.get('/', (_req, res) => {
     res.send('Restfox Test Endpoint')
 })
