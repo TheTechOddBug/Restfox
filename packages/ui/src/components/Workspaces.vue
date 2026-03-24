@@ -11,7 +11,14 @@
             <div class="workspace-name">{{ workspace.name }}</div>
             <div class="workspace-timestamp">{{ dateFormat(workspace.createdAt) }}</div>
         </div>
-        <ContextMenu :options="options" v-model:show="showContextMenu" @click="handleContextMenuClick" :element="contextMenuElement" />
+        <ContextMenu v-if="!isMobile" :options="options" v-model:show="showContextMenu" @click="handleContextMenuClick" :element="contextMenuElement" />
+        <MobileBottomSheet
+            v-else
+            :show="showWorkspaceMobileSheet"
+            :items="mobileWorkspaceOptions"
+            @select="handleContextMenuClick"
+            @update:show="showWorkspaceMobileSheet = $event"
+        />
         <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :workspace="contextMenuWorkspace" :is-electron="flags.isElectron" :is-file-workspace-supported="flags.isElectron || flags.isWebStandalone" />
         <DuplicateWorkspaceModal v-model:showModal="showDuplicateWorkspaceModal" :workspace-to-duplicate="workspaceToDuplicate" :is-electron="flags.isElectron" :is-file-workspace-supported="flags.isElectron || flags.isWebStandalone" />
     </div>
@@ -21,13 +28,20 @@
 import ContextMenu from './ContextMenu.vue'
 import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
 import DuplicateWorkspaceModal from './modals/DuplicateWorkspaceModal.vue'
+import MobileBottomSheet from './MobileBottomSheet.vue'
+import { useMobile } from '@/composables/useMobile'
 import dayjs from 'dayjs'
 
 export default {
     components: {
         ContextMenu,
         AddWorkspaceModal,
-        DuplicateWorkspaceModal
+        DuplicateWorkspaceModal,
+        MobileBottomSheet
+    },
+    setup() {
+        const { isMobile } = useMobile()
+        return { isMobile }
     },
     data() {
         return {
@@ -36,7 +50,8 @@ export default {
             contextMenuWorkspace: null,
             showAddWorkspaceModal: false,
             showDuplicateWorkspaceModal: false,
-            workspaceToDuplicate: null
+            workspaceToDuplicate: null,
+            showWorkspaceMobileSheet: false
         }
     },
     computed: {
@@ -45,6 +60,14 @@ export default {
         },
         flags() {
             return this.$store.state.flags
+        },
+        mobileWorkspaceOptions() {
+            return this.options.map(item => {
+                if(item.value === 'Delete') {
+                    return { ...item, type: 'danger' }
+                }
+                return item
+            })
         },
         options() {
             const options = [
@@ -91,8 +114,12 @@ export default {
             this.$store.commit('setActiveWorkspace', workspace)
         },
         handleContextMenu(event, workspace) {
-            this.contextMenuElement = event.target.closest('.workspace-settings-button')
             this.contextMenuWorkspace = workspace
+            if(this.isMobile) {
+                this.showWorkspaceMobileSheet = true
+                return
+            }
+            this.contextMenuElement = event.target.closest('.workspace-settings-button')
             this.showContextMenu = true
         },
         async handleContextMenuClick(clickedContextMenuItem) {
@@ -176,5 +203,17 @@ export default {
 
 .workspace-settings-button:hover {
     background-color: var(--workspace-menu-hover-background-color);
+}
+
+@media (max-width: 768px) {
+    .workspace-container {
+        gap: 0.6rem;
+        margin: 0.6rem;
+    }
+
+    .workspace {
+        width: calc(50% - 0.3rem);
+        height: 130px;
+    }
 }
 </style>

@@ -1,7 +1,21 @@
 <template>
     <div class="client-container" ref="componentRoot">
         <div class="client-component">
-            <div class="d-f flex-jc-sb mb-0_5rem ml-1rem mr-0_5rem mt-0_5rem">
+            <div v-if="isMobile" class="mobile-client-tabs">
+                <div
+                    v-for="(client, index) in activeTab.clients"
+                    :key="client.id"
+                    class="mobile-client-tab"
+                    :class="{ active: mobileActiveClientId === client.id }"
+                    @click="mobileActiveClientId = client.id"
+                >
+                    <span class="mobile-client-dot" :class="{ connected: isClientConnected(client) }"></span>
+                    Client {{ index + 1 }}
+                    <span class="mobile-client-close" @click.stop="removeClient(client)">×</span>
+                </div>
+                <div class="mobile-client-add" @click="addClient">+ Add</div>
+            </div>
+            <div v-else class="d-f flex-jc-sb mb-0_5rem ml-1rem mr-0_5rem mt-0_5rem">
                 <div>
                     <div style="display: inline-flex">
                         <div v-for="(client, index) in activeTab.clients">
@@ -26,7 +40,7 @@
                 <template v-for="client in activeTab.clients">
                     <div
                         class="client"
-                        v-if="!client.visibility || client.visibility === 'shown'"
+                        v-if="isMobile ? client.id === mobileActiveClientId : (!client.visibility || client.visibility === 'shown')"
                     >
                         <div class="d-f flex-ai-c p-0_5rem bc-primary" style="min-width: 0;">
                             <select
@@ -242,6 +256,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeMount, reactive, computed, inject, ref } from 'vue'
+import { useMobile } from '@/composables/useMobile'
 import { Client, ClientPayload, ClientMessage } from './SocketPanel.types'
 import {
     formatTimestamp,
@@ -266,6 +281,8 @@ const props = defineProps<{
 
 // Data Variables
 
+const { isMobile } = useMobile()
+const mobileActiveClientId = ref<string | null>(null)
 const componentRoot = ref<HTMLElement | null>(null)
 
 const messageContainerRefs: any = reactive({})
@@ -294,9 +311,10 @@ const $toast: { success: (message: string) => void, error: (message: string) => 
 
 function addClient() {
     const payloadId = generateId()
+    const newId = generateId()
 
     activeTab.value.clients.push({
-        id: generateId(),
+        id: newId,
         url: '',
         payloads: [
             {
@@ -310,6 +328,7 @@ function addClient() {
         messages: [],
         visibility: 'shown'
     })
+    mobileActiveClientId.value = newId
 }
 
 async function removeClient(client: Client) {
@@ -321,6 +340,9 @@ async function removeClient(client: Client) {
     activeTab.value.clients = activeTab.value.clients.filter(
         (clientItem: Client) => clientItem.id !== client.id
     )
+    if (mobileActiveClientId.value === client.id) {
+        mobileActiveClientId.value = activeTab.value.clients[0]?.id ?? null
+    }
 }
 
 function toggleClientVisibility(client: Client) {
@@ -592,6 +614,7 @@ function scrollToBottomClientMessages(clientId: string) {
 function loadSavedClients() {
     const savedClients = activeTab.value.clients
     if (savedClients) {
+        mobileActiveClientId.value = savedClients[0]?.id ?? null
         activeTab.value.clients.forEach((client) => {
             if (client.visibility !== 'hidden') {
                 scrollToBottomClientMessages(client.id)
@@ -617,6 +640,7 @@ function loadSavedClients() {
         }
 
         activeTab.value.clients = [initialClient]
+        mobileActiveClientId.value = initialClient.id
     }
 }
 
@@ -746,6 +770,65 @@ onBeforeMount(async() => {
 </script>
 
 <style scoped>
+.mobile-client-tabs {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--default-border-color);
+    background: var(--background-color);
+    flex-shrink: 0;
+}
+
+.mobile-client-tabs::-webkit-scrollbar { display: none; }
+
+.mobile-client-tab {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text-color);
+    border-right: 1px solid var(--default-border-color);
+    white-space: nowrap;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.mobile-client-tab.active {
+    background: var(--background-color);
+    border-top: 2px solid var(--primary-background-color);
+    color: var(--text-color);
+}
+
+.mobile-client-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--default-border-color);
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.mobile-client-dot.connected {
+    background: #75ba24;
+}
+
+.mobile-client-close {
+    color: var(--tip-text-color);
+    font-size: 14px;
+    line-height: 1;
+    margin-left: 2px;
+}
+
+.mobile-client-add {
+    padding: 8px 12px;
+    color: var(--primary-background-color);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
 .client-container {
     display: grid;
     grid-template-columns: 1fr;
@@ -772,6 +855,15 @@ onBeforeMount(async() => {
     grid-template-rows: auto auto auto 1fr;
     border: 1px solid var(--default-border-color);
     border-radius: 5px;
+}
+
+@media (max-width: 768px) {
+    .client {
+        flex: 0 0 100%;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
 }
 
 .client:first-child {

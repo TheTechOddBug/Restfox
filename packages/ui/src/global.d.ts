@@ -205,6 +205,11 @@ export interface State {
     idMap: Map<string, string> | null
     skipPersistingActiveTab: boolean
     collectionRunner: CollectionRunnerState
+    activeMobilePanel: 'collections' | 'content' | 'response'
+    showEnvironmentModal: boolean
+    showSettingsModal: boolean
+    showPluginManagerModal: boolean
+    showLogsModal: boolean
 }
 
 export interface Plugin {

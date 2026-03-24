@@ -1,11 +1,12 @@
 <template>
-    <section class="request-response-panels" :class="{ 'top-bottom': requestResponseLayoutTopBottom, 'left-right': !requestResponseLayoutTopBottom }" v-resizable.top-bottom="requestResponseLayoutTopBottom" v-show="collectionItem && collectionItem._type === 'request'" :key="'request-panel-layout-' + requestResponseLayoutTopBottom" @resized="requestPanelResized">
+    <section class="request-response-panels" :class="{ 'top-bottom': requestResponseLayoutTopBottom, 'left-right': !requestResponseLayoutTopBottom }" v-resizable.top-bottom="requestResponseLayoutTopBottom" v-show="collectionItem && collectionItem._type === 'request' && (!isMobile || activeMobilePanel !== 'collections')" :key="'request-panel-layout-' + requestResponseLayoutTopBottom" @resized="requestPanelResized">
         <section
             class="request-panel" :data-min-width-px="!requestResponseLayoutTopBottom ? 250 : 100" :style="{
                 'flexGrow': requestPanelRatio,
                 'minWidth': !requestResponseLayoutTopBottom ? '250px' : null,
                 'minHeight': requestResponseLayoutTopBottom ? '100px' : null
             }"
+            v-show="!isMobile || activeMobilePanel === 'content'"
         >
             <KeepAlive>
                 <RequestPanel
@@ -15,7 +16,7 @@
             </KeepAlive>
         </section>
 
-        <section class="resizer" data-resizer></section>
+        <section class="resizer" data-resizer v-show="!isMobile"></section>
 
         <section
             class="response-panel" :data-min-width-px="!requestResponseLayoutTopBottom ? 250 : 100" :style="{
@@ -23,6 +24,7 @@
                 'minWidth': !requestResponseLayoutTopBottom ? '250px' : null,
                 'minHeight': requestResponseLayoutTopBottom ? '100px' : null
             }"
+            v-show="!isMobile || activeMobilePanel === 'response'"
         >
             <KeepAlive>
                 <ResponsePanel
@@ -33,23 +35,23 @@
         </section>
     </section>
 
-    <section class="request-response-panels" v-if="collectionItem && collectionItem._type === 'socket'">
+    <section class="request-response-panels" v-if="collectionItem && collectionItem._type === 'socket' && (!isMobile || activeMobilePanel !== 'collections')">
         <KeepAlive>
             <SocketPanel :key="collectionItem._id" :active-tab="collectionItem" />
         </KeepAlive>
     </section>
 
-    <section class="request-response-panels" v-show="collectionItem && collectionItem._type === 'request_group'">
+    <section class="request-response-panels" v-show="collectionItem && collectionItem._type === 'request_group' && (!isMobile || activeMobilePanel !== 'collections')">
         <FolderPanel :collection-item="collectionItem" />
     </section>
 
-    <section class="request-response-panels" v-if="!collectionItem">
+    <section class="request-response-panels" v-if="!collectionItem && (!isMobile || activeMobilePanel !== 'collections')">
         <NewRequestShortcutPanel></NewRequestShortcutPanel>
     </section>
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { CollectionItem } from '@/globals'
 import RequestPanel from '@/components/RequestPanel.vue'
 import ResponsePanel from '@/components/ResponsePanel.vue'
@@ -60,6 +62,7 @@ import { findItemInTreeById } from '@/helpers'
 import { State } from '@/global'
 import FolderPanel from '@/components/FolderPanel.vue'
 import NewRequestShortcutPanel from '@/components/NewRequestShortcutPanel.vue'
+import { useMobile } from '@/composables/useMobile'
 
 const props = defineProps<{
     collectionItem: CollectionItem | null;
@@ -71,6 +74,8 @@ const props = defineProps<{
 
 // computed
 const store: Store<State> = useStore()
+const { isMobile } = useMobile()
+const activeMobilePanel = computed(() => store.state.activeMobilePanel)
 
 // watch
 watch(() => props.collectionItem, (newValue, oldValue) => {
@@ -167,5 +172,13 @@ watch(() => props.collectionItem, (newValue, oldValue) => {
 
 .request-response-panels > .resizer:hover, .request-response-panels > .resizer[data-resizing] {
     background-color: darksalmon;
+}
+
+@media (max-width: 768px) {
+    .request-response-panels.left-right > .request-panel,
+    .request-response-panels.left-right > .response-panel {
+        flex: 1 1 100%;
+        min-width: unset;
+    }
 }
 </style>

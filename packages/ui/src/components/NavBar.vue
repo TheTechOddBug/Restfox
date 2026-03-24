@@ -98,12 +98,14 @@
             </div>
         </div>
     </div>
-    <PluginManagerModal v-model:showModal="showPluginManagerModal" />
-    <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :is-electron="flags.isElectron" :is-file-workspace-supported="flags.isElectron || flags.isWebStandalone" />
-    <SettingsModal v-model:showModal="showSettingsModal" />
-    <LogsModal v-model:showModal="showLogsModal"></LogsModal>
-    <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" v-if="activeWorkspace" :key="activeWorkspace._id" />
-    <BackupAndRestoreModal />
+    <teleport to="body">
+        <PluginManagerModal v-model:showModal="showPluginManagerModal" />
+        <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :is-electron="flags.isElectron" :is-file-workspace-supported="flags.isElectron || flags.isWebStandalone" />
+        <SettingsModal v-model:showModal="showSettingsModal" />
+        <LogsModal v-model:showModal="showLogsModal"></LogsModal>
+        <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" v-if="activeWorkspace" :key="activeWorkspace._id" />
+        <BackupAndRestoreModal />
+    </teleport>
     <ContextMenu
         :options="workspaceQuickSwitcherOptions"
         :element="workspaceQuickSwitcherElement"
@@ -151,11 +153,7 @@ export default {
     },
     data() {
         return {
-            showSettingsModal: false,
-            showPluginManagerModal: false,
             showAddWorkspaceModal: false,
-            environmentModalShow: false,
-            showLogsModal: false,
             workspaceQuickSwitcherElement: null,
             workspaceQuickSwitcherContextMenuX: null,
             workspaceQuickSwitcherContextMenuY: null,
@@ -175,6 +173,38 @@ export default {
         }
     },
     computed: {
+        environmentModalShow: {
+            get() {
+                return this.$store.state.showEnvironmentModal
+            },
+            set(val) {
+                this.$store.commit('showEnvironmentModal', val)
+            }
+        },
+        showSettingsModal: {
+            get() {
+                return this.$store.state.showSettingsModal
+            },
+            set(val) {
+                this.$store.commit('showSettingsModal', val)
+            }
+        },
+        showPluginManagerModal: {
+            get() {
+                return this.$store.state.showPluginManagerModal
+            },
+            set(val) {
+                this.$store.commit('showPluginManagerModal', val)
+            }
+        },
+        showLogsModal: {
+            get() {
+                return this.$store.state.showLogsModal
+            },
+            set(val) {
+                this.$store.commit('showLogsModal', val)
+            }
+        },
         collectionLength() {
             return this.$store.state.collection.length
         },
@@ -503,10 +533,25 @@ export default {
     }
 }
 
+@media (max-width: 768px) {
+    .navbar {
+        font-size: 0.8rem;
+        overflow-x: auto;
+        padding-left: 0.4rem;
+        padding-right: 0.4rem;
+    }
+
+    .right-nav-container a {
+        padding-left: 0.3rem;
+        padding-right: 0.3rem;
+    }
+}
+
 .navbar-item {
     display: inline-flex;
     align-items: center;
     height: 100%;
     border-left: 1px solid var(--border-color-lighter);
 }
+
 </style>

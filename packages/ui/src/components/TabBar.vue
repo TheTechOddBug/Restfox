@@ -15,20 +15,36 @@
             @contextmenu.prevent="handleTabContextMenu($event, tab)"
         >
             <span :class="`request-method--${getTabMethodName(tab)}`">{{ getTabMethodName(tab) }}</span> <template v-if="tab._id in sidebarItemTemporaryName">{{ sidebarItemTemporaryName[tab._id] }}</template><template v-else>{{ tab.name }}</template>
+            <span class="tab-more-btn" @click.stop="handleTabMoreBtn($event, tab)">⋮</span>
             <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close"><i class="fas fa-times"></i></span>
         </div>
     </div>
     <!-- <div class="tab-add" @click="addTab" style="visibility: hidden">+</div> -->
     <ContextMenu :options="tabContextMenuOptions" :element="tabContextMenuElement" v-model:show="showTabContextMenu" @click="handleTabContextMenuItemClick" />
+    <MobileBottomSheet
+        v-if="isMobile"
+        :show="showTabMobileSheet"
+        :title="tabSheetTitle"
+        :items="tabMobileSheetItems"
+        @select="handleTabContextMenuItemClick"
+        @update:show="showTabMobileSheet = $event"
+    />
 </template>
 
 <script>
 import ContextMenu from './ContextMenu.vue'
+import MobileBottomSheet from './MobileBottomSheet.vue'
 import { arrayMove } from '@/helpers'
+import { useMobile } from '@/composables/useMobile'
 
 export default {
     components: {
-        ContextMenu
+        ContextMenu,
+        MobileBottomSheet
+    },
+    setup() {
+        const { isMobile } = useMobile()
+        return { isMobile }
     },
     data() {
         return {
@@ -37,6 +53,7 @@ export default {
             tabContextMenuElement: null,
             tabContextMenuTab: null,
             showTabContextMenu: false,
+            showTabMobileSheet: false,
             tabsContextMenuList: [
                 {
                     'type': 'option',
@@ -68,6 +85,19 @@ export default {
         },
         sidebarItemTemporaryName() {
             return this.$store.state.sidebarItemTemporaryName
+        },
+        tabMobileSheetItems() {
+            return this.tabContextMenuOptions
+        },
+        tabSheetTitle() {
+            if (!this.tabContextMenuTab) {
+                return ''
+            }
+            const method = this.getTabMethodName(this.tabContextMenuTab)
+            const name = this.tabContextMenuTab._id in this.sidebarItemTemporaryName
+                ? this.sidebarItemTemporaryName[this.tabContextMenuTab._id]
+                : this.tabContextMenuTab.name
+            return method ? `${method} ${name}` : name
         },
         tabContextMenuOptions() {
             if (this.tabs.length === 1) {
@@ -166,6 +196,14 @@ export default {
                 const indexOfTabToDropOn = this.tabs.findIndex(item => item._id === tabToDropOn.dataset.id)
                 arrayMove(this.tabs, this.indexOfDraggedTab, indexOfTabToDropOn)
                 this.$store.commit('persistActiveWorkspaceTabs')
+            }
+        },
+        handleTabMoreBtn(event, tab) {
+            if(this.isMobile) {
+                this.tabContextMenuTab = tab
+                this.showTabMobileSheet = true
+            } else {
+                this.handleTabContextMenu(event, tab)
             }
         },
         handleTabContextMenu(event, tab) {
@@ -268,5 +306,46 @@ export default {
     padding-right: 1rem;
     border-top: 1px solid transparent;
     border-bottom: 1px solid transparent;
+}
+
+@media (max-width: 768px) {
+    .tab-bar .tabs-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        flex-wrap: nowrap;
+    }
+
+    .tab-bar .tabs-container::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tab-bar .tab {
+        flex-shrink: 0;
+        white-space: nowrap;
+        max-width: 160px;
+        border-left: 3px solid transparent;
+        padding: 6px 8px;
+        font-size: 0.85rem;
+    }
+
+    .tab-bar .tab.tab-active {
+        border-left-color: var(--base-color-info);
+    }
+
+    .tab-more-btn {
+        display: inline-block;
+        padding: 0 4px;
+        font-size: 1rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+}
+
+/* Hide ⋮ button on desktop */
+@media (min-width: 769px) {
+    .tab-more-btn {
+        display: none;
+    }
 }
 </style>

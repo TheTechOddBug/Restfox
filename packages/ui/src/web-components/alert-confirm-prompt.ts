@@ -262,6 +262,18 @@ class AlertConfirmPrompt extends HTMLElement {
             background-color: var(--modal-background-color);
             color: var(--text-color);
         }
+
+        @media (max-width: 768px) {
+            .dialog {
+                max-width: calc(100vw - 2rem);
+                box-sizing: border-box;
+            }
+
+            .dialog-input {
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+        }
         </style>
         `
 

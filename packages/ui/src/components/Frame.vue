@@ -5,11 +5,15 @@ import Sidebar from '@/components/Sidebar.vue'
 import WindowPortal from '@/components/WindowPortal.vue'
 import Tab from '@/components/Tab.vue'
 import ImportModal from '@/components/ImportModal.vue'
+import BottomNav from '@/components/BottomNav.vue'
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useStore } from 'vuex'
 import constants from '../constants'
+import { useMobile } from '@/composables/useMobile'
 
 const store = useStore()
+const { isMobile } = useMobile()
+const activeMobilePanel = computed(() => store.state.activeMobilePanel)
 const activeTab = computed(() => store.state.activeTab)
 const showTabs = computed(() => store.state.flags.showTabs)
 const requestResponseLayoutTopBottom = computed(() => store.state.requestResponseLayout === 'top-bottom')
@@ -36,6 +40,9 @@ function setContainerGridColumnWidths(sidebarWidth) {
 }
 
 function onSidebarResize(e) {
+    if(isMobile.value) {
+        return
+    }
     const sidebar = e[0].target
     if(sidebar.style.width) {
         const sidebarWidth = getComputedStyle(sidebar).width
@@ -65,7 +72,7 @@ onMounted(() => {
     const savedResponsePanelRatio = localStorage.getItem(constants.LOCAL_STORAGE_KEY.RESPONSE_PANEL_RATIO)
     const savedRequestResponseLayout = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_RESPONSE_LAYOUT)
 
-    if(savedSidebarWidth) {
+    if(savedSidebarWidth && !isMobile.value) {
         sidebar.style.width = savedSidebarWidth
         setContainerGridColumnWidths(savedSidebarWidth)
     }
@@ -98,9 +105,11 @@ onBeforeUnmount(() => {
             <TabBar />
         </section>
 
-        <aside class="sidebar">
+        <aside class="sidebar" :class="{ 'sidebar-open': isMobile && activeMobilePanel === 'collections' }">
             <Sidebar />
         </aside>
+
+        <BottomNav />
 
         <Tab
             :collection-item="activeTab"
@@ -167,5 +176,41 @@ header {
     min-width: 300px;
     width: 300px;
     max-width: 500px;
+}
+
+@media (max-width: 768px) {
+    .container {
+        grid-template-areas:
+            "tab-bar"
+            "request-response-panels"
+            "bottom-nav";
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+    }
+
+    header {
+        display: none;
+    }
+
+    .sidebar {
+        grid-row: 2;
+        grid-column: 1;
+        position: relative;
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        min-width: unset;
+        border-right: none;
+        transform: none;
+        transition: none;
+        resize: none;
+        overflow-y: auto;
+        display: none;
+    }
+
+    .sidebar.sidebar-open {
+        display: flex;
+        z-index: 1;
+    }
 }
 </style>

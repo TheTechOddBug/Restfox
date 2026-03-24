@@ -24,7 +24,7 @@ export = function() {
 
         async isActiveTab(name: string) {
             const text = await this.grabTextFrom('.tab.tab-active')
-            this.expectEqual(text.trim() === name, true)
+            this.expectEqual(text.replace('⋮', '').trim() === name, true)
         },
 
         typeInRequestPanelAddressBar(url: string, clear = false) {

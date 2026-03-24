@@ -24,7 +24,15 @@
             </template>
         </div>
     </div>
-    <ContextMenu :options="options" :element="sidebarContextMenuElement" v-model:show="showContextMenu" @click="handleClick" :x="contextMenuX" :y="contextMenuY" :x-offset="20" />
+    <ContextMenu v-if="!isMobile" :options="options" :element="sidebarContextMenuElement" v-model:show="showContextMenu" @click="handleClick" :x="contextMenuX" :y="contextMenuY" :x-offset="20" />
+    <MobileBottomSheet
+        v-else
+        :show="showContextMenu"
+        :title="sidebarSheetTitle"
+        :items="mobileOptions"
+        @select="handleClick"
+        @update:show="val => { if (!val) { showContextMenu = false } }"
+    />
     <AddRequestModal v-model:showModal="addRequestModalShow" :parent-id="addRequestModalParentId" />
     <AddGraphQLRequestModal v-model:showModal="addGraphQLRequestModalShow" :parent-id="addRequestModalParentId" />
     <AddSocketModal v-model:showModal="addSocketModalShow" :parent-id="addSocketModalParentId" />
@@ -40,8 +48,10 @@
 
 <script>
 import { toRaw } from 'vue'
+import { useMobile } from '@/composables/useMobile'
 import SidebarItem from './SidebarItem.vue'
 import ContextMenu from './ContextMenu.vue'
+import MobileBottomSheet from '@/components/MobileBottomSheet.vue'
 import AddRequestModal from './modals/AddRequestModal.vue'
 import AddSocketModal from './modals/AddSocketModal.vue'
 import AddFolderModal from './modals/AddFolderModal.vue'
@@ -72,6 +82,11 @@ export default {
         GenerateCodeModal,
         CollectionRunnerModal,
         CollectionRunnerProgressModal,
+        MobileBottomSheet,
+    },
+    setup() {
+        const { isMobile } = useMobile()
+        return { isMobile }
     },
     data() {
         return {
@@ -168,6 +183,33 @@ export default {
             }
         },
         ...mapState(['activeSidebarItemForContextMenu', 'sidebarContextMenuElement']),
+        activeMobilePanel() {
+            return this.$store.state.activeMobilePanel
+        },
+        sidebarSheetTitle() {
+            if (this.enableOptionsForEmptyContextMenu || !this.activeSidebarItemForContextMenu) {
+                return ''
+            }
+            const item = this.activeSidebarItemForContextMenu
+            if (item._type === 'request') {
+                return `${item.method} ${item.name}`
+            }
+            if (item._type === 'socket') {
+                return `SOCK ${item.name}`
+            }
+            return item.name
+        },
+        mobileOptions() {
+            return this.options.map(item => {
+                if (item.disabled) {
+                    return { type: 'section-header', label: item.label, icon: item.icon }
+                }
+                if (item.value === 'Delete') {
+                    return { type: 'danger', label: item.label, value: item.value, icon: item.icon }
+                }
+                return { type: 'option', label: item.label, value: item.value, icon: item.icon }
+            })
+        },
         options() {
             if(this.enableOptionsForEmptyContextMenu) {
                 const menuItems = [...this.createNewList]
@@ -739,6 +781,14 @@ export default {
     display: block;
     position: absolute;
     right: 0;
+}
+
+@media (max-width: 768px) {
+    .sidebar .sidebar-item .clickable-context-menu {
+        display: block;
+        position: absolute;
+        right: 0;
+    }
 }
 
 .sidebar .sidebar-item .clickable-context-menu i {

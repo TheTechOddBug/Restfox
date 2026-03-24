@@ -110,6 +110,7 @@ html {
     --menu-border-color: #82828240;
     --send-request-button-color: #7f4fd5;
     --send-request-button-hover-color: #673ab7;
+    --nav-active-color: #097bed;
 }
 
 html.theme-dark {
@@ -208,6 +209,7 @@ html.theme-dark {
     --menu-border-color: #48484880;
     --send-request-button-color: #7f4fd5;
     --send-request-button-hover-color: #673ab7;
+    --nav-active-color: #ab7aff;
 }
 
 html.theme-dracula {
@@ -306,6 +308,7 @@ html.theme-dracula {
     --menu-border-color: #6272a47f;
     --send-request-button-color: #7f4fd5;
     --send-request-button-hover-color: #673ab7;
+    --nav-active-color: #bd93f9;
 }
 
 * {

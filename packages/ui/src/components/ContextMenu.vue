@@ -43,6 +43,10 @@ function getContextMenuPostion(x, y, contextMenuElement, yOffset = 0, width = nu
         menuPostion.x = mousePosition.x
     }
 
+    if(menuPostion.x < 0) {
+        menuPostion.x = 0
+    }
+
     // If the menu is going to be below the bottom of the screen, move it up
     if(mousePosition.y + menuDimension.y > window.innerHeight + document.body.scrollTop) {
         menuPostion.y = mousePosition.y - menuDimension.y - yOffset

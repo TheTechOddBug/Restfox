@@ -300,4 +300,11 @@ export default {
     pointer-events: auto;
     line-height: 1;
 }
+
+@media (max-width: 768px) {
+    /* Touch-friendly minimum tap target */
+    .sidebar-item {
+        min-height: 44px;
+    }
+}
 </style>

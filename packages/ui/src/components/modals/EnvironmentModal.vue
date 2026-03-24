@@ -10,8 +10,8 @@
                 </button>
             </template>
 
-            <div style="display: grid; grid-template-columns: auto 1fr; height: 100%; overflow: auto;">
-                <div style="display: grid; grid-template-rows: auto 1fr; height: 100%; overflow: auto; margin-right: 1rem; border-right: 1px solid var(--modal-border-color)">
+            <div class="env-body">
+                <div class="env-sidebar-col">
                     <button class="button" type="button" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" @click="addEnvironment()">Add Environment</button>
                     <div style="overflow-y: auto;" class="environment-sidebar">
                         <div v-for="environment in environments" class="environment-sidebar-item" :class="{ 'environment-sidebar-item-active': environment.name === currentEnvironment }" @click="changeEnvironment(environment)" :ref="'environment-' + environment.name">
@@ -26,7 +26,7 @@
                         </div>
                     </div>
                 </div>
-                <div style="display: grid; grid-template-rows: 1fr auto; overflow: auto;">
+                <div class="env-editor-col">
                     <CodeMirrorEditor
                         v-model="environment"
                         lang="json"
@@ -639,5 +639,50 @@ export default {
 
 .ml-1rem {
     margin-left: 1rem;
+}
+
+.env-body {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    height: 100%;
+    overflow: auto;
+}
+
+.env-sidebar-col {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100%;
+    overflow: auto;
+    margin-right: 1rem;
+    border-right: 1px solid var(--modal-border-color);
+}
+
+.env-editor-col {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    overflow: auto;
+}
+
+@media (max-width: 768px) {
+    .env-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+        min-height: 100%;
+    }
+
+    .env-sidebar-col {
+        height: auto;
+        max-height: 150px;
+        margin-right: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--modal-border-color);
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .env-editor-col {
+        min-height: 200px;
+    }
 }
 </style>

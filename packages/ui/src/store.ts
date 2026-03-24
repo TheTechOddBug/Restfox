@@ -381,7 +381,12 @@ export const store = createStore<State>({
                 continueOnError: true,
                 startTime: null,
                 currentRequestId: null
-            }
+            },
+            activeMobilePanel: 'content' as 'collections' | 'content' | 'response',
+            showEnvironmentModal: false,
+            showSettingsModal: false,
+            showPluginManagerModal: false,
+            showLogsModal: false,
         }
     },
     getters: {
@@ -397,6 +402,21 @@ export const store = createStore<State>({
         }
     },
     mutations: {
+        setActiveMobilePanel(state, panel: 'collections' | 'content' | 'response') {
+            state.activeMobilePanel = panel
+        },
+        showEnvironmentModal(state, value: boolean) {
+            state.showEnvironmentModal = value
+        },
+        showSettingsModal(state, value: boolean) {
+            state.showSettingsModal = value
+        },
+        showPluginManagerModal(state, value: boolean) {
+            state.showPluginManagerModal = value
+        },
+        showLogsModal(state, value: boolean) {
+            state.showLogsModal = value
+        },
         closeTab(state, collectionItemId) {
             const tabIndex = state.tabs.findIndex(tabItem => tabItem._id === collectionItemId)
 

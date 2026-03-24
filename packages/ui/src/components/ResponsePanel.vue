@@ -206,6 +206,13 @@
         :selected-option="response"
         @click="handleResponseHistoryContextMenuItemClick"
     />
+    <MobileBottomSheet
+        v-if="isMobile"
+        v-model:show="showResponseHistorySheet"
+        title="Response History"
+        :items="mobileHistorySheetItems"
+        @select="handleResponseHistoryContextMenuItemClick"
+    />
     <ResponseFilteringHelpModal v-model:showModal="showResponseFilteringHelpModal" v-model:is-xml="isXmlResponse"></ResponseFilteringHelpModal>
 </template>
 
@@ -213,6 +220,8 @@
 import { nextTick, toRaw } from 'vue'
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
+import MobileBottomSheet from './MobileBottomSheet.vue'
+import { useMobile } from '@/composables/useMobile'
 import ImageFromBuffer from './ImageFromBuffer.vue'
 import IframeFromBuffer from './IframeFromBuffer.vue'
 import PdfFromBuffer from './PdfFromBuffer.vue'
@@ -245,10 +254,15 @@ export default {
         ResponseFilteringHelpModal,
         CodeMirrorResponsePanelPreview,
         ContextMenu,
+        MobileBottomSheet,
         ImageFromBuffer,
         IframeFromBuffer,
         PdfFromBuffer,
         ResponsePanelTimeline,
+    },
+    setup() {
+        const { isMobile } = useMobile()
+        return { isMobile }
     },
     directives: {
         tooltip: vTooltip
@@ -272,6 +286,8 @@ export default {
             responseHistoryContextMenuWidth: null,
             responseHistoryContextMenuOptionsType: null,
             showResponseHistoryContextMenu: false,
+            showResponseHistorySheet: false,
+            mobileHistorySheetItems: [],
             currentlySelectedText: '',
             isXmlResponse: false,
             showResponseFilteringHelpModal: false,
@@ -606,6 +622,29 @@ export default {
                 this.responseHistoryContextMenuOptionsType = 'click'
             } else {
                 this.responseHistoryContextMenuOptionsType = 'contextmenu'
+            }
+
+            if(this.isMobile) {
+                if(this.responseHistoryContextMenuOptionsType === 'click') {
+                    this.mobileHistorySheetItems = (this.responses ?? []).map(item => ({
+                        label: dateFormat(item.createdAt, true),
+                        tags: [
+                            { text: `${item.status} ${this.getStatusText(item.status)}`, color: responseStatusColorMapping(item) },
+                            { text: humanFriendlyTime(item.timeTaken) },
+                        ],
+                        method: item.request?.method ?? null,
+                        sublabel: item.name ?? item.url,
+                        value: item,
+                    }))
+                } else {
+                    this.mobileHistorySheetItems = [
+                        { label: 'Rename Response', value: 'Rename Current Response', icon: 'fa-edit' },
+                        { label: 'Delete Response', value: 'Delete Current Response', icon: 'fa-trash', type: 'danger' },
+                        { label: 'Clear History', value: 'Clear History', icon: 'fa-trash', type: 'danger' },
+                    ]
+                }
+                this.showResponseHistorySheet = true
+                return
             }
 
             const containerElement = event.target.closest('.custom-dropdown')
@@ -977,5 +1016,23 @@ export default {
     position: sticky;
     bottom: 0;
     background-color: var(--background-color);
+}
+
+@media (max-width: 768px) {
+    .response-panel-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+    }
+
+    .response-panel-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .response-panel-tab {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
 }
 </style>

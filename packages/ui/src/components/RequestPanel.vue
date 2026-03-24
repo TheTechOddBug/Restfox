@@ -438,6 +438,7 @@
 </template>
 
 <script lang="ts">
+import { useMobile } from '@/composables/useMobile'
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import RequestPanelTabTitle from '@/components/RequestPanelTabTitle.vue'
@@ -495,6 +496,10 @@ export default {
     },
     props: {
         activeTab: Object,
+    },
+    setup() {
+        const { isMobile } = useMobile()
+        return { isMobile }
     },
     data() {
         return {
@@ -649,6 +654,9 @@ export default {
         activeWorkspace() {
             return this.$store.state.activeWorkspace
         },
+        activeMobilePanel() {
+            return this.$store.state.activeMobilePanel
+        },
         collectionItemEnvironmentResolved() {
             if (this.activeTab === null) {
                 return {}
@@ -685,6 +693,11 @@ export default {
         }
     },
     watch: {
+        isMobile(val) {
+            if(val) {
+                this.tabView = 'full'
+            }
+        },
         activeTab() {
             this.attachRootElementResizeObserver()
         },
@@ -775,6 +788,9 @@ export default {
         async sendRequest(value) {
             if(value === 'send') {
                 this.$store.dispatch('sendRequest', this.activeTab)
+                if(this.isMobile) {
+                    this.$store.commit('setActiveMobilePanel', 'response')
+                }
             }
 
             if(value === 'generate-code') {
@@ -786,6 +802,9 @@ export default {
                 this.delayRequestSending = await window.createPrompt('Delay in seconds')
 
                 if(this.delayRequestSending) {
+                    if(this.isMobile) {
+                        this.$store.commit('setActiveMobilePanel', 'response')
+                    }
                     this.delayRequestSending = setTimeout(() => {
                         this.$store.dispatch('sendRequest', this.activeTab)
                         this.delayRequestSending = null
@@ -797,6 +816,9 @@ export default {
                 this.intervalRequestSending = await window.createPrompt('Interval in seconds')
 
                 if(this.intervalRequestSending) {
+                    if(this.isMobile) {
+                        this.$store.commit('setActiveMobilePanel', 'response')
+                    }
                     this.intervalRequestSending = setInterval(() => {
                         this.$store.dispatch('sendRequest', this.activeTab)
                     }, this.intervalRequestSending * 1000)
@@ -905,6 +927,9 @@ export default {
             param.files = Array.from(files)
         },
         onRootElementResize() {
+            if(this.isMobile) {
+                return
+            }  // always use scrollable tabs on mobile
             const scrollWidth = 'requestPanelTabViewSwitchedScrollWidth' in window ? window.requestPanelTabViewSwitchedScrollWidth : this.$el.parentElement.scrollWidth
             if(this.$el.parentElement.clientWidth < scrollWidth) {
                 this.tabView = 'portable'
@@ -1297,5 +1322,23 @@ export default {
 
 .send-options.custom-dropdown > i {
     padding: 0;
+}
+
+@media (max-width: 768px) {
+    .request-panel-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+    }
+
+    .request-panel-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .request-panel-tab {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
 }
 </style>

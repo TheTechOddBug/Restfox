@@ -150,6 +150,13 @@ export default {
     margin-right: var(--gutter);
 }
 
+@media (max-width: 768px) {
+    .modal__container {
+        min-width: unset;
+        width: calc(100vw - 32px);
+    }
+}
+
 .modal__content {
     display: flex;
     flex-direction: column;
