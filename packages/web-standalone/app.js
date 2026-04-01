@@ -38,6 +38,8 @@ function getAgentForRequest(urlParsed, disableSSLVerification) {
                 rejectUnauthorized: disableSSLVerification ? false : true,
             },
             allowH2: true,
+            headersTimeout: 0,
+            bodyTimeout: 0,
         })
 
         agents.set(key, agent)

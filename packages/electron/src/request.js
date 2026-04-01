@@ -78,6 +78,8 @@ function getAgentForRequest(urlParsed, disableSSLVerification) {
                 },
             },
             allowH2: true,
+            headersTimeout: 0,
+            bodyTimeout: 0,
         })
 
         agents.set(key, agent)
