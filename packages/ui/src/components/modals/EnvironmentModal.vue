@@ -14,8 +14,23 @@
                 <div class="env-sidebar-col">
                     <button class="button" type="button" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" @click="addEnvironment()">Add Environment</button>
                     <div style="overflow-y: auto;" class="environment-sidebar">
-                        <div v-for="environment in environments" class="environment-sidebar-item" :class="{ 'environment-sidebar-item-active': environment.name === currentEnvironment }" @click="changeEnvironment(environment)" :ref="'environment-' + environment.name">
-                            <div><i class="fa fa-circle" :style="{ color: environment.color, marginRight: '0.5rem' }"></i>{{ environment.name }}</div>
+                        <div
+                            v-for="(environment, index) in environments" :key="environment.name"
+                            class="environment-sidebar-item"
+                            :class="{ 'environment-sidebar-item-active': environment.name === currentEnvironment }"
+                            @click="changeEnvironment(environment)"
+                            :ref="'environment-' + environment.name"
+                            draggable="true"
+                            @dragstart="onDragStart(index, $event)"
+                            @dragover.prevent
+                            @dragenter.prevent
+                            @drop="onDrop(index)"
+                            @dragend="onDragEnd"
+                        >
+                            <div style="display: flex; align-items: center;">
+                                <i class="fa fa-circle" :style="{ color: environment.color, marginRight: '0.5rem' }"></i>{{ environment.name }}
+                            </div>
+
                             <div class="environment-sidebar-item-menu" :class="{ 'environment-sidebar-item-menu-disable-hide': environment.name === clickedContextMenuEnvironment.name && showEnvironmentContextMenuPopup === true }" @click.stop="showEnvironmentContextMenu($event, environment)">
                                 <svg viewBox="0 0 24 24" focusable="false" style="pointer-events: none; display: block; width: 100%; height: 100%;">
                                     <g>
@@ -106,6 +121,7 @@ export default {
             editTagModalShow: false,
             editTagParsedFunc: null,
             editTagUpdateFunc: null,
+            draggedEnvironmentIndex: null
         }
     },
     computed: {
@@ -305,6 +321,26 @@ export default {
             if(manuallyTriggerSave) {
                 this.saveEnvironment()
             }
+        },
+        onDragStart(index, event) {
+            this.draggedEnvironmentIndex = index
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = 'move'
+                event.dataTransfer.setData('text/plain', index)
+            }
+        },
+        onDrop(dropIndex) {
+            if (this.draggedEnvironmentIndex === null || this.draggedEnvironmentIndex === dropIndex) {
+                return
+            }
+
+            const draggedItem = this.environments.splice(this.draggedEnvironmentIndex, 1)[0]
+            this.environments.splice(dropIndex, 0, draggedItem)
+            this.saveEnvironments()
+            this.draggedEnvironmentIndex = null
+        },
+        onDragEnd() {
+            this.draggedEnvironmentIndex = null
         },
         saveEnvironment() {
             if(this.collectionItem) {
