@@ -66,6 +66,7 @@ import {
     PluginTestResult,
 } from './global'
 import * as queryParamsSync from '@/utils/query-params-sync'
+import { computeTargetIndex, isDropIntoOwnSubtree } from '@/utils/sidebar-drop'
 
 async function loadResponses(state: State, tabId: string) {
     if(tabId in state.responses) {
@@ -1086,6 +1087,11 @@ export const store = createStore<State>({
                 return
             }
 
+            // don't allow an item to be dropped into its own nested list or a descendant's nested list
+            if(isDropIntoOwnSubtree(context.state.collectionTree, payload.from.id, payload.to.parentId)) {
+                return
+            }
+
             let targetKey = 'parentId'
             if(payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom') { // dropping an item into a folder, bottom = pink highlight
                 targetKey = 'id'
@@ -1117,16 +1123,11 @@ export const store = createStore<State>({
             sourceParentCollection.splice(sourceIndex, 1)
             sourceItem.parentId = payload.to[targetKey] ?? null
 
-            let targetIndex = targetParentCollection.findIndex(item => item._id === payload.to.id)
-            if(payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom') { // dropping an item into a folder, bottom = pink highlight
-                targetIndex = 0
-            }
-            if(payload.to.type === 'request' && payload.to.cursorPosition === 'bottom') {
-                targetIndex++
-            }
-            if(payload.to.type === 'sidebar-list' && payload.to.cursorPosition === 'bottom') {
-                targetIndex = targetParentCollection.length
-            }
+            const targetIndex = computeTargetIndex(targetParentCollection, {
+                id: payload.to.id,
+                type: payload.to.type,
+                cursorPosition: payload.to.cursorPosition,
+            })
             targetParentCollection.splice(targetIndex, 0, sourceItem)
 
             const collectionItemIndex = context.state.collection.findIndex(item => item._id === sourceItem._id)

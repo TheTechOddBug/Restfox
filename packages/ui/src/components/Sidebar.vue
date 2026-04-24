@@ -64,6 +64,7 @@ import CollectionRunnerModal from './modals/CollectionRunnerModal.vue'
 import CollectionRunnerProgressModal from './modals/CollectionRunnerProgressModal.vue'
 import { mapState } from 'vuex'
 import { flattenTree, exportRestfoxCollection, generateNewIdsForTree, deepClone } from '@/helpers'
+import { resolveSidebarDropTarget } from '@/utils/sidebar-drop'
 import { generateCode } from '@/utils/generate-code'
 import AddGraphQLRequestModal from '@/components/modals/AddGraphQLRequestModal.vue'
 
@@ -470,29 +471,6 @@ export default {
             this.enableOptionsForEmptyContextMenu = true
             this.showContextMenu = true
         },
-        getDropTargetElementContainer(event) {
-            let container
-            const sidebarItem = event.target.closest('.sidebar-item')
-            const sidebarListContainer = event.target.closest('.sidebar-list-container')
-            if (sidebarItem) {
-                container = {
-                    type: 'sidebar-item',
-                    element: sidebarItem
-                }
-            } else if (sidebarListContainer) {
-                const innerList = sidebarListContainer.querySelector('.sidebar-list')
-                if (!innerList) {
-                    return
-                }
-                container = {
-                    type: 'sidebar-list',
-                    element: innerList
-                }
-            } else {
-                return null
-            }
-            return container
-        },
         dragStart(event) {
             if(this.collectionFilter) { // disable drag functionality if collection is being filtered
                 return
@@ -517,12 +495,12 @@ export default {
             if(!this.draggedSidebarElement) {
                 return
             }
-            const container = this.getDropTargetElementContainer(event)
-            if(!container) {
+            const target = resolveSidebarDropTarget(event.target)
+            if(!target) {
                 return
             }
 
-            const elementToDropOn = container.element
+            const { element: elementToDropOn } = target
             const rect = elementToDropOn.getBoundingClientRect()
             const offset = rect.top + document.body.scrollTop
             const elementHeight = parseFloat(getComputedStyle(elementToDropOn, null).height.replace('px', ''))
@@ -535,7 +513,7 @@ export default {
                 elementToDropOn.style.backgroundColor = ''
             } else {
                 this.sidebarItemCursorPosition = 'bottom'
-                if(elementToDropOn.dataset.type === 'request_group') {
+                if(target.type === 'request_group') {
                     elementToDropOn.style.borderTop = ''
                     elementToDropOn.style.borderBottom = ''
                     elementToDropOn.style.backgroundColor = 'var(--drop-target-background-color)'
@@ -547,54 +525,49 @@ export default {
             }
             event.preventDefault()
         },
+        clearDropTargetStyling(element) {
+            element.style.borderTop = ''
+            element.style.borderBottom = ''
+            element.style.backgroundColor = ''
+        },
         dragLeave(event) {
             if(!this.draggedSidebarElement) {
                 return
             }
-            const container = this.getDropTargetElementContainer(event)
-            if(!container) {
+            const target = resolveSidebarDropTarget(event.target)
+            if(!target) {
                 return
             }
-            const elementToDropOn = container.element
-            if(elementToDropOn) {
-                elementToDropOn.style.borderBottom = ''
-                elementToDropOn.style.borderTop = ''
-                elementToDropOn.style.backgroundColor = ''
-            }
+            this.clearDropTargetStyling(target.element)
         },
         drop(event) {
             if(!this.draggedSidebarElement) {
                 return
             }
             event.preventDefault()
-            const container = this.getDropTargetElementContainer(event)
-            if(!container) {
+            const target = resolveSidebarDropTarget(event.target)
+            if(!target) {
                 return
             }
 
-            const elementToDropOn = container.element
-            if(elementToDropOn) {
-                elementToDropOn.style.borderTop = ''
-                elementToDropOn.style.borderBottom = ''
-                elementToDropOn.style.backgroundColor = ''
+            this.clearDropTargetStyling(target.element)
 
-                this.$store.dispatch('reorderCollectionItem', {
-                    from: {
-                        parentId: this.draggedSidebarElement.dataset.parentId,
-                        id: this.draggedSidebarElement.dataset.id
-                    },
-                    to: {
-                        parentId: elementToDropOn.dataset.parentId,
-                        id: elementToDropOn.dataset.id,
-                        type: elementToDropOn.dataset.type ?? container.type,
-                        cursorPosition: this.sidebarItemCursorPosition
-                    }
-                })
+            this.$store.dispatch('reorderCollectionItem', {
+                from: {
+                    parentId: this.draggedSidebarElement.dataset.parentId,
+                    id: this.draggedSidebarElement.dataset.id
+                },
+                to: {
+                    parentId: target.parentId,
+                    id: target.id,
+                    type: target.type,
+                    cursorPosition: this.sidebarItemCursorPosition
+                }
+            })
 
-                this.draggedSidebarElement.style.backgroundColor = ''
-                this.draggedSidebarElement.style.opacity = ''
-                this.draggedSidebarElement = null
-            }
+            this.draggedSidebarElement.style.backgroundColor = ''
+            this.draggedSidebarElement.style.opacity = ''
+            this.draggedSidebarElement = null
         },
         async updateCollectionItem(collectionItem) {
             const result = await this.$store.dispatch('updateCollectionItem', {

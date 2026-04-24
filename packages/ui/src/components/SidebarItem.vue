@@ -65,7 +65,7 @@
         :selected-option="currentEnvironment.name"
         @click="selectFolderEnv"
     />
-    <div class="sidebar-list" v-if="'children' in sidebarItem && sidebarItem.children.length && getSidebarItemExpandedState(sidebarItem)">
+    <div class="sidebar-list" :data-parent-id="sidebarItem._id" v-if="'children' in sidebarItem && sidebarItem.children.length && getSidebarItemExpandedState(sidebarItem)">
         <template v-for="sidebarItem1 in sidebarItem.children" :key="sidebarItem1._id">
             <SidebarItem :sidebar-item="sidebarItem1" />
         </template>
