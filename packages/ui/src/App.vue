@@ -19,6 +19,7 @@ import {
     applyTheme,
     debounce,
     initStoragePersistence,
+    getSavedRequestTimeout,
 } from './helpers'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
@@ -389,6 +390,8 @@ export default {
                 this.$store.state.flags.electronSwitchToChromiumFetch = false
             }
         }
+
+        this.$store.state.flags.requestTimeout = getSavedRequestTimeout()
 
         if(savedDisableIframeSandbox) {
             try {
